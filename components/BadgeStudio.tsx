@@ -5,6 +5,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  Archive,
   ArrowDown,
   ArrowRight,
   ArrowUp,
@@ -24,6 +25,7 @@ import {
   FileText,
   FolderOpen,
   GalleryHorizontal,
+  GripVertical,
   Group,
   Image as ImageIcon,
   ImagePlus,
@@ -44,6 +46,7 @@ import {
   Ruler,
   Rows3,
   ShieldCheck,
+  SlidersHorizontal,
   Square,
   Trash2,
   Type,
@@ -93,6 +96,7 @@ type BackgroundFit = "cover" | "contain" | "stretch";
 type PagePreset = "A4" | "A3" | "Letter" | "custom";
 type OutputMode = "standard" | "table-tent";
 type InspectorSheetState = "collapsed" | "half" | "expanded";
+type ResponsiveToolPanel = "badge" | "background" | "elements" | null;
 
 type CommonElement = {
   id: string;
@@ -185,6 +189,15 @@ type DataSnapshot = {
 type DataHistoryEntry = {
   includesElements: boolean;
   snapshot: DataSnapshot;
+};
+
+type DataRowPointerDrag = {
+  pointerId: number;
+  rowId: string;
+  startY: number;
+  moved: boolean;
+  historyRecorded: boolean;
+  lastTargetRowId?: string;
 };
 
 type PageSettings = {
@@ -3136,14 +3149,14 @@ export function BadgeStudio() {
   const [historyPast, setHistoryPast] = useState<CanvasElement[][]>([]);
   const [historyFuture, setHistoryFuture] = useState<CanvasElement[][]>([]);
   const [selectedElementId, setSelectedElementIdState] = useState<string | null>(
-    "element-name",
+    null,
   );
-  const [selectedElementIds, setSelectedElementIdsState] = useState<string[]>([
-    "element-name",
-  ]);
+  const [selectedElementIds, setSelectedElementIdsState] = useState<string[]>([]);
   const [fields, setFields] = useState<string[]>(DEFAULT_FIELDS);
   const [rows, setRows] = useState<BadgeRow[]>(SAMPLE_ROWS);
   const [selectedRowId, setSelectedRowId] = useState("row-1");
+  const [selectedDataRowIds, setSelectedDataRowIds] = useState<string[]>([]);
+  const [draggedDataRowId, setDraggedDataRowId] = useState<string | null>(null);
   const [dataHistoryPast, setDataHistoryPast] = useState<DataHistoryEntry[]>(
     [],
   );
@@ -3171,6 +3184,7 @@ export function BadgeStudio() {
   });
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [isPrintSettingsOpen, setIsPrintSettingsOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [savedProjects, setSavedProjects] = useState<StoredProjectSummary[]>([]);
@@ -3178,6 +3192,8 @@ export function BadgeStudio() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [inspectorSheetState, setInspectorSheetState] =
     useState<InspectorSheetState>("collapsed");
+  const [responsiveToolPanel, setResponsiveToolPanel] =
+    useState<ResponsiveToolPanel>(null);
   const [inspectorSheetDragOffset, setInspectorSheetDragOffset] = useState(0);
   const [isInspectorSheetDragging, setIsInspectorSheetDragging] =
     useState(false);
@@ -3191,12 +3207,14 @@ export function BadgeStudio() {
   const brandCropDragRef = useRef<BrandCropDrag | null>(null);
   const canvasContextMenuRef = useRef<HTMLDivElement>(null);
   const newFieldInputRef = useRef<HTMLInputElement>(null);
+  const selectAllRowsRef = useRef<HTMLInputElement>(null);
+  const dataRowPointerDragRef = useRef<DataRowPointerDrag | null>(null);
   const guideTimerRef = useRef<number | null>(null);
   const elementsRef = useRef<CanvasElement[]>(DEFAULT_ELEMENTS);
   const fieldsRef = useRef<string[]>(DEFAULT_FIELDS);
   const rowsRef = useRef<BadgeRow[]>(SAMPLE_ROWS);
-  const selectedElementIdRef = useRef<string | null>("element-name");
-  const selectedElementIdsRef = useRef<string[]>(["element-name"]);
+  const selectedElementIdRef = useRef<string | null>(null);
+  const selectedElementIdsRef = useRef<string[]>([]);
   const selectedRowIdRef = useRef("row-1");
   const activeDataCellKeyRef = useRef<string | null>(null);
   const dataCellEditRecordedRef = useRef(false);
@@ -3549,6 +3567,20 @@ export function BadgeStudio() {
   }, [rows]);
 
   useEffect(() => {
+    const rowIds = new Set(rows.map((row) => row.id));
+    setSelectedDataRowIds((current) =>
+      current.filter((rowId) => rowIds.has(rowId)),
+    );
+  }, [rows]);
+
+  useEffect(() => {
+    if (!selectAllRowsRef.current) return;
+    selectAllRowsRef.current.indeterminate =
+      selectedDataRowIds.length > 0 &&
+      selectedDataRowIds.length < rows.length;
+  }, [rows.length, selectedDataRowIds.length]);
+
+  useEffect(() => {
     selectedElementIdRef.current = selectedElementId;
   }, [selectedElementId]);
 
@@ -3557,7 +3589,21 @@ export function BadgeStudio() {
   }, [selectedElementIds]);
 
   useEffect(() => {
+    if (mode !== "print") setIsPrintSettingsOpen(false);
+  }, [mode]);
+
+  useEffect(() => {
+    if (!isPrintSettingsOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsPrintSettingsOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isPrintSettingsOpen]);
+
+  useEffect(() => {
     if (!selectedElementIds.length) return;
+    setResponsiveToolPanel(null);
     setInspectorSheetState((current) =>
       current === "collapsed" ? "half" : current,
     );
@@ -3665,6 +3711,9 @@ export function BadgeStudio() {
   function resetDataHistory() {
     setDataHistoryPast([]);
     setDataHistoryFuture([]);
+    setSelectedDataRowIds([]);
+    setDraggedDataRowId(null);
+    dataRowPointerDragRef.current = null;
     activeDataCellKeyRef.current = null;
     dataCellEditRecordedRef.current = false;
   }
@@ -3762,6 +3811,18 @@ export function BadgeStudio() {
   function snapInspectorSheet(next: InspectorSheetState) {
     setInspectorSheetState(next);
     setInspectorSheetDragOffset(0);
+  }
+
+  function openResponsiveToolPanel(panel: Exclude<ResponsiveToolPanel, null>) {
+    setSelection([]);
+    snapInspectorSheet("collapsed");
+    setResponsiveToolPanel((current) => (current === panel ? null : panel));
+  }
+
+  function openResponsiveLayerPanel() {
+    setResponsiveToolPanel(null);
+    setSelection([]);
+    snapInspectorSheet("half");
   }
 
   function moveInspectorSheet(direction: "up" | "down") {
@@ -3907,10 +3968,13 @@ export function BadgeStudio() {
       }
       if (event.key === "Escape") {
         if (document.querySelector(".canvas-context-menu")) return;
+        if (responsiveToolPanel) {
+          setResponsiveToolPanel(null);
+          return;
+        }
         if (
           inspectorSheetState !== "collapsed" &&
-          window.matchMedia("(min-width: 681px) and (max-width: 980px)")
-            .matches
+          window.matchMedia("(max-width: 980px)").matches
         ) {
           setInspectorSheetState("collapsed");
           setInspectorSheetDragOffset(0);
@@ -3928,6 +3992,7 @@ export function BadgeStudio() {
     deleteSelectedFromShortcut,
     inspectorSheetState,
     mode,
+    responsiveToolPanel,
     redoData,
     redoElements,
     undoData,
@@ -3946,7 +4011,8 @@ export function BadgeStudio() {
     elementsRef.current = project.elements;
     setHistoryPast([]);
     setHistoryFuture([]);
-    setSelectedElementId(project.elements[0]?.id ?? null);
+    setSelectedElementId(null);
+    snapInspectorSheet("collapsed");
     setFields(project.fields);
     setRows(project.rows);
     setSelectedRowId(project.rows[0]?.id || "");
@@ -4050,7 +4116,8 @@ export function BadgeStudio() {
     elementsRef.current = presetElements;
     setHistoryPast([]);
     setHistoryFuture([]);
-    setSelectedElementId("element-name");
+    setSelectedElementId(null);
+    snapInspectorSheet("collapsed");
     setFields(sampleData.fields);
     setRows(sampleData.rows);
     setSelectedRowId("row-1");
@@ -5414,7 +5481,11 @@ export function BadgeStudio() {
   }
 
   function focusNewFieldInput() {
-    newFieldInputRef.current?.focus();
+    newFieldInputRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    window.requestAnimationFrame(() => newFieldInputRef.current?.focus());
   }
 
   function renameField(field: string, nextName: string) {
@@ -5503,14 +5574,122 @@ export function BadgeStudio() {
     setSelectedRowId(row.id);
   }
 
-  function removeRow(id: string) {
-    if (!rows.some((row) => row.id === id)) return;
+  function toggleDataRowSelection(rowId: string) {
+    setSelectedDataRowIds((current) =>
+      current.includes(rowId)
+        ? current.filter((id) => id !== rowId)
+        : [...current, rowId],
+    );
+  }
+
+  function toggleAllDataRows() {
+    setSelectedDataRowIds((current) =>
+      rows.length > 0 && current.length === rows.length
+        ? []
+        : rows.map((row) => row.id),
+    );
+  }
+
+  function removeSelectedDataRows() {
+    if (!selectedDataRowIds.length) return;
+    const selectedIds = new Set(selectedDataRowIds);
     rememberData();
-    setRows((current) => current.filter((row) => row.id !== id));
-    if (selectedRowId === id) {
-      const nextRow = rows.find((row) => row.id !== id);
-      setSelectedRowId(nextRow?.id || "");
+    const nextRows = rowsRef.current.filter((row) => !selectedIds.has(row.id));
+    rowsRef.current = nextRows;
+    setRows(nextRows);
+    if (selectedIds.has(selectedRowIdRef.current)) {
+      const nextSelectedRowId = nextRows[0]?.id || "";
+      selectedRowIdRef.current = nextSelectedRowId;
+      setSelectedRowId(nextSelectedRowId);
     }
+    setSelectedDataRowIds([]);
+  }
+
+  function reorderDataRow(rowId: string, targetRowId: string) {
+    if (rowId === targetRowId) return false;
+    const current = rowsRef.current;
+    const fromIndex = current.findIndex((row) => row.id === rowId);
+    const targetIndex = current.findIndex((row) => row.id === targetRowId);
+    if (fromIndex < 0 || targetIndex < 0 || fromIndex === targetIndex) {
+      return false;
+    }
+    const nextRows = [...current];
+    const [movedRow] = nextRows.splice(fromIndex, 1);
+    nextRows.splice(targetIndex, 0, movedRow);
+    rowsRef.current = nextRows;
+    setRows(nextRows);
+    return true;
+  }
+
+  function moveDataRowBy(rowId: string, offset: number) {
+    const current = rowsRef.current;
+    const fromIndex = current.findIndex((row) => row.id === rowId);
+    const targetIndex = clamp(fromIndex + offset, 0, current.length - 1);
+    if (fromIndex < 0 || fromIndex === targetIndex) return;
+    rememberData();
+    reorderDataRow(rowId, current[targetIndex].id);
+  }
+
+  function handleDataRowPointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    rowId: string,
+  ) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.focus({ preventScroll: true });
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dataRowPointerDragRef.current = {
+      pointerId: event.pointerId,
+      rowId,
+      startY: event.clientY,
+      moved: false,
+      historyRecorded: false,
+      lastTargetRowId: rowId,
+    };
+    setDraggedDataRowId(rowId);
+  }
+
+  function handleDataRowPointerMove(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    const dragState = dataRowPointerDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    if (!dragState.moved && Math.abs(event.clientY - dragState.startY) < 6) {
+      return;
+    }
+    event.preventDefault();
+    dragState.moved = true;
+    const targetRow = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLTableRowElement>("tr[data-row-id]");
+    const targetRowId = targetRow?.dataset.rowId;
+    if (
+      !targetRowId ||
+      targetRowId === dragState.rowId ||
+      targetRowId === dragState.lastTargetRowId
+    ) {
+      return;
+    }
+    if (!dragState.historyRecorded) {
+      rememberData();
+      dragState.historyRecorded = true;
+    }
+    if (reorderDataRow(dragState.rowId, targetRowId)) {
+      dragState.lastTargetRowId = targetRowId;
+    }
+  }
+
+  function endDataRowPointerDrag(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    const dragState = dataRowPointerDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dataRowPointerDragRef.current = null;
+    setDraggedDataRowId(null);
   }
 
   function updateRow(id: string, field: string, value: string) {
@@ -5852,7 +6031,7 @@ export function BadgeStudio() {
               >
                 <span className="step-number">{index + 1}</span>
                 <Icon size={17} />
-                {item.label}
+                <span className="mode-label">{item.label}</span>
               </button>
             );
           })}
@@ -5888,25 +6067,65 @@ export function BadgeStudio() {
                 ? t("saveFailed")
                 : t("saved")}
           </span>
-          <button
-            className="primary-button top-export"
-            type="button"
-            onClick={exportPdf}
-            disabled={isExporting}
-          >
-            <Download size={17} />
-            {isExporting
-              ? t("pdfProgress", { progress: exportProgress })
-              : t("createPdf")}
-          </button>
+          {mode !== "print" && (
+            <button
+              className="primary-button top-export"
+              type="button"
+              onClick={() => setMode(mode === "design" ? "data" : "print")}
+              aria-label={mode === "design" ? t("data") : t("goPrint")}
+              title={mode === "design" ? t("data") : t("goPrint")}
+            >
+              {mode === "design" ? (
+                <Database size={17} aria-hidden="true" />
+              ) : (
+                <Printer size={17} aria-hidden="true" />
+              )}
+              <span>{mode === "design" ? t("data") : t("goPrint")}</span>
+              <ArrowRight size={15} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </header>
 
       <main id="main-content" className="main-content">
         {mode === "design" && (
           <div className="design-workspace">
-            <aside className="panel left-panel" aria-label={t("designTools")}>
-              <section className="panel-section">
+            <button
+              type="button"
+              className={`responsive-panel-scrim ${
+                responsiveToolPanel ? "is-visible" : ""
+              }`}
+              onClick={() => setResponsiveToolPanel(null)}
+              aria-label={t("closeInspectorSheet")}
+              aria-hidden={!responsiveToolPanel}
+              tabIndex={responsiveToolPanel ? 0 : -1}
+            />
+
+            <aside
+              className={`panel left-panel responsive-tool-panel ${
+                responsiveToolPanel ? `is-open is-${responsiveToolPanel}` : ""
+              }`}
+              aria-label={t("designTools")}
+            >
+              <div className="responsive-tool-panel-header">
+                <span className="responsive-tool-panel-handle" aria-hidden="true" />
+                <strong>
+                  {responsiveToolPanel === "badge"
+                    ? t("badgeSize")
+                    : responsiveToolPanel === "background"
+                      ? t("backgroundImage")
+                      : t("elementLibrary")}
+                </strong>
+                <button
+                  type="button"
+                  onClick={() => setResponsiveToolPanel(null)}
+                  aria-label={t("closeInspectorSheet")}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="responsive-tool-panel-body">
+              <section className="panel-section responsive-badge-section">
                 <div className="section-title">
                   <h2>{t("badgeSize")}</h2>
                   <span>mm</span>
@@ -5941,9 +6160,21 @@ export function BadgeStudio() {
                     />
                   </label>
                 </div>
+                <label className="responsive-badge-safe-area">
+                  <span>{t("safeArea", { value: "" }).replace(" mm", "")}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="15"
+                    step="0.5"
+                    value={safeArea}
+                    onChange={(event) => setSafeArea(Number(event.target.value))}
+                  />
+                  <strong>{safeArea} mm</strong>
+                </label>
               </section>
 
-              <section className="panel-section">
+              <section className="panel-section responsive-background-section">
                 <div className="section-title">
                   <h2>{t("backgroundImage")}</h2>
                 </div>
@@ -6025,7 +6256,7 @@ export function BadgeStudio() {
                 </label>
               </section>
 
-              <section className="panel-section">
+              <section className="panel-section responsive-element-section">
                 <div className="section-title">
                   <h2>{t("imageLogo")}</h2>
                 </div>
@@ -6082,7 +6313,7 @@ export function BadgeStudio() {
                 </label>
               </section>
 
-              <section className="panel-section element-library-section">
+              <section className="panel-section element-library-section responsive-element-section">
                 <div className="section-title">
                   <h2>{t("textElements")}</h2>
                 </div>
@@ -6102,7 +6333,7 @@ export function BadgeStudio() {
                 </div>
               </section>
 
-              <section className="panel-section element-library-section">
+              <section className="panel-section element-library-section responsive-element-section">
                 <div className="section-title">
                   <h2>{t("shapes")}</h2>
                 </div>
@@ -6122,7 +6353,7 @@ export function BadgeStudio() {
                 </div>
               </section>
 
-              <section className="panel-section element-library-section grow-section qr-launch-section">
+              <section className="panel-section element-library-section responsive-element-section grow-section qr-launch-section">
                 <button
                   ref={qrLaunchButtonRef}
                   type="button"
@@ -6133,9 +6364,43 @@ export function BadgeStudio() {
                   {t("generateQrCode")}
                 </button>
               </section>
+              </div>
             </aside>
 
             <section className="canvas-workspace" aria-label={t("badgeCanvas")}>
+              <nav className="responsive-editor-toolbar" aria-label={t("designTools")}>
+                <button
+                  type="button"
+                  className={responsiveToolPanel === "badge" ? "is-active" : ""}
+                  onClick={() => openResponsiveToolPanel("badge")}
+                  aria-pressed={responsiveToolPanel === "badge"}
+                >
+                  <Ruler size={19} aria-hidden="true" />
+                  <span>{t("badgeSize")}</span>
+                </button>
+                <button
+                  type="button"
+                  className={responsiveToolPanel === "background" ? "is-active" : ""}
+                  onClick={() => openResponsiveToolPanel("background")}
+                  aria-pressed={responsiveToolPanel === "background"}
+                >
+                  <ImageIcon size={19} aria-hidden="true" />
+                  <span>{t("backgroundImage")}</span>
+                </button>
+                <button
+                  type="button"
+                  className={responsiveToolPanel === "elements" ? "is-active" : ""}
+                  onClick={() => openResponsiveToolPanel("elements")}
+                  aria-pressed={responsiveToolPanel === "elements"}
+                >
+                  <Plus size={19} aria-hidden="true" />
+                  <span>{t("elementLibrary")}</span>
+                </button>
+                <button type="button" onClick={openResponsiveLayerPanel}>
+                  <Layers3 size={19} aria-hidden="true" />
+                  <span>{t("layers")}</span>
+                </button>
+              </nav>
               <div className="canvas-toolbar">
                 <div>
                   <CreditCard className="canvas-side-icon" size={14} />
@@ -6184,7 +6449,7 @@ export function BadgeStudio() {
                       onClick={exportProject}
                       title={t("backupTitle")}
                     >
-                      <Download size={15} />
+                      <Archive size={15} />
                       {t("backup")}
                     </button>
                   </div>
@@ -6195,6 +6460,8 @@ export function BadgeStudio() {
                 className="canvas-stage"
                 onPointerDown={() => {
                   setSelection([]);
+                  setResponsiveToolPanel(null);
+                  snapInspectorSheet("collapsed");
                   setCanvasContextMenu(null);
                 }}
               >
@@ -6266,19 +6533,19 @@ export function BadgeStudio() {
             <button
               type="button"
               className={`inspector-sheet-scrim ${
-                inspectorSheetState === "expanded" ? "is-visible" : ""
+                inspectorSheetState !== "collapsed" ? "is-visible" : ""
               }`}
               onClick={() => snapInspectorSheet("collapsed")}
               aria-label={t("closeInspectorSheet")}
-              aria-hidden={inspectorSheetState !== "expanded"}
-              tabIndex={inspectorSheetState === "expanded" ? 0 : -1}
+              aria-hidden={inspectorSheetState === "collapsed"}
+              tabIndex={inspectorSheetState !== "collapsed" ? 0 : -1}
             />
 
             <aside
               id="tablet-inspector-sheet"
               className={`panel right-panel inspector-sheet is-${inspectorSheetState} ${
                 isInspectorSheetDragging ? "is-dragging" : ""
-              }`}
+              } ${responsiveToolPanel ? "is-suppressed" : ""}`}
               aria-label={t("elementProperties")}
               style={
                 {
@@ -6335,7 +6602,16 @@ export function BadgeStudio() {
                 >
                   <ArrowDown size={17} aria-hidden="true" />
                 </button>
+                <button
+                  type="button"
+                  className="inspector-side-close"
+                  onClick={() => snapInspectorSheet("collapsed")}
+                  aria-label={t("closeInspectorSheet")}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
               </div>
+              <div className="inspector-sheet-body">
               {selectedElement ? (
                 <>
                   <section className="panel-section element-header">
@@ -7434,6 +7710,7 @@ export function BadgeStudio() {
                   </section>
                 </>
               )}
+              </div>
             </aside>
           </div>
         )}
@@ -7456,6 +7733,15 @@ export function BadgeStudio() {
                       onChange={(event) => handleCsv(event.target.files?.[0])}
                     />
                   </label>
+                  <button
+                    type="button"
+                    className="secondary-button mobile-column-action"
+                    onClick={focusNewFieldInput}
+                    aria-controls="new-field"
+                  >
+                    <Columns3 size={16} aria-hidden="true" />
+                    {t("newColumnVariable")}
+                  </button>
                 </div>
               </div>
 
@@ -7470,15 +7756,44 @@ export function BadgeStudio() {
                   <FileSpreadsheet size={17} />
                   {t("totalPeople", { count: rows.length })}
                 </span>
-                <span className="data-hint">
-                  {t("csvHint", { count: MAX_ROWS })}
-                </span>
+                <div className="data-toolbar-end">
+                  {selectedDataRowIds.length > 0 && (
+                    <button
+                      type="button"
+                      className="delete-selected-rows"
+                      onClick={removeSelectedDataRows}
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                      {t("deleteSelectedRows", {
+                        count: selectedDataRowIds.length,
+                      })}
+                    </button>
+                  )}
+                  <span className="data-hint">
+                    {t("csvHint", { count: MAX_ROWS })}
+                  </span>
+                </div>
               </div>
 
               <div className="table-scroll">
                 <table className="data-table">
                   <thead>
                     <tr>
+                      <th className="row-select">
+                        <input
+                          ref={selectAllRowsRef}
+                          type="checkbox"
+                          checked={rows.length > 0 && selectedDataRowIds.length === rows.length}
+                          onChange={toggleAllDataRows}
+                          aria-label={t("selectAllRows")}
+                        />
+                      </th>
+                      <th className="row-reorder">
+                        <span className="sr-only">
+                          {t("reorderRow", { row: "" })}
+                        </span>
+                        <GripVertical size={15} aria-hidden="true" />
+                      </th>
                       <th className="row-number">#</th>
                       {fields.map((field) => (
                         <th key={field}>
@@ -7492,7 +7807,6 @@ export function BadgeStudio() {
                           </button>
                         </th>
                       ))}
-                      <th className="row-actions">{t("manage")}</th>
                       <th className="add-column-cell">
                         <button
                           type="button"
@@ -7510,11 +7824,49 @@ export function BadgeStudio() {
                     {rows.map((row, rowIndex) => (
                       <tr
                         key={row.id}
-                        className={
+                        data-row-id={row.id}
+                        className={`${
                           selectedRowId === row.id ? "is-selected" : ""
-                        }
+                        } ${
+                          draggedDataRowId === row.id ? "is-reordering" : ""
+                        }`}
                         onClick={() => setSelectedRowId(row.id)}
                       >
+                        <td className="row-select">
+                          <input
+                            type="checkbox"
+                            checked={selectedDataRowIds.includes(row.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={() => toggleDataRowSelection(row.id)}
+                            aria-label={t("selectRow", { row: rowIndex + 1 })}
+                          />
+                        </td>
+                        <td className="row-reorder">
+                          <button
+                            type="button"
+                            className="row-drag-handle"
+                            onPointerDown={(event) =>
+                              handleDataRowPointerDown(event, row.id)
+                            }
+                            onPointerMove={handleDataRowPointerMove}
+                            onPointerUp={endDataRowPointerDrag}
+                            onPointerCancel={endDataRowPointerDrag}
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => {
+                              if (event.key === "ArrowUp") {
+                                event.preventDefault();
+                                moveDataRowBy(row.id, -1);
+                              } else if (event.key === "ArrowDown") {
+                                event.preventDefault();
+                                moveDataRowBy(row.id, 1);
+                              }
+                            }}
+                            aria-label={t("reorderRow", { row: rowIndex + 1 })}
+                            title={`${t("moveRowUp", { row: rowIndex + 1 })} · ${t("moveRowDown", { row: rowIndex + 1 })}`}
+                          >
+                            <GripVertical size={17} aria-hidden="true" />
+                          </button>
+                        </td>
                         <td className="row-number">{rowIndex + 1}</td>
                         {fields.map((field) => (
                           <td key={field}>
@@ -7539,18 +7891,6 @@ export function BadgeStudio() {
                             />
                           </td>
                         ))}
-                        <td className="row-actions">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              removeRow(row.id);
-                            }}
-                            aria-label={t("deleteRow", { row: rowIndex + 1 })}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
                         <td className="add-column-cell" aria-hidden="true" />
                       </tr>
                     ))}
@@ -7701,18 +8041,6 @@ export function BadgeStudio() {
                 {t("fillSample")}
               </button>
 
-              <div className="side-next-step">
-                <span>{t("nextStep")}</span>
-                <strong>{t("badgesReady", { count: rows.length })}</strong>
-                <button
-                  type="button"
-                  className="primary-button full-width"
-                  onClick={() => setMode("print")}
-                >
-                  {t("goPrint")}
-                  <Printer size={16} />
-                </button>
-              </div>
             </aside>
           </div>
         )}
@@ -7735,6 +8063,16 @@ export function BadgeStudio() {
                     {t("page")}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  className="secondary-button mobile-print-settings-trigger"
+                  onClick={() => setIsPrintSettingsOpen(true)}
+                  aria-controls="print-settings-panel"
+                  aria-expanded={isPrintSettingsOpen}
+                >
+                  <SlidersHorizontal size={17} aria-hidden="true" />
+                  {t("outputSettings")}
+                </button>
               </div>
 
               <div className="print-preview-area">
@@ -7890,10 +8228,36 @@ export function BadgeStudio() {
               </div>
             </section>
 
+            <button
+              type="button"
+              className={`print-settings-scrim ${
+                isPrintSettingsOpen ? "is-visible" : ""
+              }`}
+              onClick={() => setIsPrintSettingsOpen(false)}
+              aria-label={t("closeInspectorSheet")}
+              aria-hidden={!isPrintSettingsOpen}
+              tabIndex={isPrintSettingsOpen ? 0 : -1}
+            />
+
             <aside
-              className="panel print-settings"
+              id="print-settings-panel"
+              className={`panel print-settings ${
+                isPrintSettingsOpen ? "is-open" : ""
+              }`}
               aria-label={t("outputSettings")}
             >
+              <div className="mobile-print-sheet-header">
+                <span className="mobile-print-sheet-handle" aria-hidden="true" />
+                <strong>{t("outputSettings")}</strong>
+                <button
+                  type="button"
+                  onClick={() => setIsPrintSettingsOpen(false)}
+                  aria-label={t("closeInspectorSheet")}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="print-settings-scroll">
               {outputMode === "table-tent" ? (
                 <section className="panel-section table-tent-output">
                   <div className="section-title">
@@ -8097,6 +8461,7 @@ export function BadgeStudio() {
                   </select>
                 </label>
               </section>
+              </div>
 
               <div className="export-summary">
                 <div>
