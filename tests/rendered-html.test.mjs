@@ -186,6 +186,16 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(studio, /const \[previewPageIndex, setPreviewPageIndex\]/);
   assert.match(studio, /previewRows\.map\(\(row, index\) =>/);
   assert.match(studio, /className="preview-pagination"/);
+  assert.match(studio, /className="secondary-button mobile-print-settings-trigger"/);
+  assert.match(studio, /id="print-settings-panel"/);
+  assert.match(studio, /className="mobile-print-sheet-header"/);
+  assert.match(studio, /className="print-settings-scroll"/);
+  assert.match(studio, /mode !== "print"/);
+  const topbarExportMarkup = studio.slice(
+    studio.indexOf('{mode !== "print"'),
+    studio.indexOf("</header>"),
+  );
+  assert.doesNotMatch(topbarExportMarkup, /onClick=\{exportPdf\}/);
   assert.match(studio, /function PreviewCropMarks/);
   assert.match(studio, /<PreviewCropMarks/);
   assert.match(studio, /className="secondary-button full-width orientation-swap-button"/);
@@ -195,7 +205,18 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(studio, /const undoData = useCallback/);
   assert.match(studio, /mode === "data"/);
   assert.match(studio, /className="data-add-actions"/);
+  assert.match(studio, /className="secondary-button mobile-column-action"/);
   assert.match(studio, /className="add-column-cell"/);
+  assert.match(studio, /className="row-select"/);
+  assert.match(studio, /className="row-reorder"/);
+  assert.match(studio, /className="row-drag-handle"/);
+  assert.match(studio, /className="delete-selected-rows"/);
+  assert.match(studio, /handleDataRowPointerDown/);
+  assert.match(studio, /handleDataRowPointerMove/);
+  assert.match(studio, /removeSelectedDataRows/);
+  assert.match(studio, /moveDataRowBy/);
+  assert.doesNotMatch(studio, /className="row-actions"/);
+  assert.doesNotMatch(studio, /t\("manage"\)/);
   assert.match(studio, /const DEFAULT_FIELDS = \["사람 이름", "팀", "직책"\]/);
   assert.match(studio, /name: "이름 텍스트"/);
   assert.match(studio, /newColumnVariable/);
@@ -252,6 +273,15 @@ test("keeps production editing, project storage, and PDF rendering connected", a
     /inspectorSheetState === "collapsed" \? "half" : "collapsed"/,
   );
   assert.match(studio, /className="inspector-sheet-handle"/);
+  assert.match(studio, /type ResponsiveToolPanel =/);
+  assert.match(studio, /className="responsive-editor-toolbar"/);
+  assert.match(studio, /className="mode-label"/);
+  assert.match(studio, /openResponsiveToolPanel\("badge"\)/);
+  assert.match(studio, /openResponsiveToolPanel\("background"\)/);
+  assert.match(studio, /openResponsiveToolPanel\("elements"\)/);
+  assert.match(studio, /openResponsiveLayerPanel/);
+  assert.match(studio, /className="responsive-tool-panel-body"/);
+  assert.match(studio, /className="inspector-sheet-body"/);
   assert.match(studio, /backgroundColor,\s+background,\s+backgroundFit,/);
   assert.match(studio, /for \(const element of elements\)/);
   assert.doesNotMatch(
@@ -306,6 +336,63 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(css, /touch-action: none/);
   assert.match(css, /\.inspector-sheet-grip\s*{[^}]*place-items: center/s);
   assert.match(css, /\.inspector-sheet-handle\s*{[^}]*width: 40px/s);
+  assert.match(
+    css,
+    /\.responsive-editor-toolbar\s*{[^}]*grid-template-columns: repeat\(4,/s,
+  );
+  assert.match(
+    css,
+    /\.mode-nav\s*{[^}]*grid-template-columns: repeat\(3,/s,
+  );
+  assert.match(
+    css,
+    /\.mode-nav button\s*{[^}]*border: 1px solid transparent[^}]*padding: 0 var\(--control-padding-x\)/s,
+  );
+  const modeActiveCss = css.slice(
+    css.indexOf(".mode-nav button.is-active"),
+    css.indexOf(".step-number"),
+  );
+  assert.doesNotMatch(
+    modeActiveCss,
+    /(?:padding|width|height|min-width|min-height|transform|box-shadow)\s*:/,
+  );
+  assert.match(css, /\.topbar\s*{[^}]*z-index: 90/s);
+  assert.match(css, /\.mode-nav\s*{[^}]*z-index: 80/s);
+  assert.match(css, /\.responsive-editor-toolbar\s*{[^}]*z-index: 75/s);
+  assert.match(css, /html\s*{[^}]*scrollbar-gutter: stable/s);
+  assert.doesNotMatch(
+    css,
+    /\.primary-button:hover:not\(:disabled\)\s*{[^}]*transform:/s,
+  );
+  assert.doesNotMatch(
+    css,
+    /\.asset-upload-button:hover\s*{[^}]*transform:/s,
+  );
+  assert.doesNotMatch(css, /\.preset-card:hover\s*{[^}]*transform:/s);
+  assert.match(
+    css,
+    /\.left-panel\.responsive-tool-panel\s*{[^}]*position: fixed/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 680px\)[\s\S]*\.right-panel\.inspector-sheet\s*{[^}]*position: fixed/s,
+  );
+  assert.match(
+    css,
+    /\.inspector-sheet-body::-webkit-scrollbar[^{]*{[^}]*display: none/s,
+  );
+  assert.match(
+    css,
+    /\.responsive-tool-panel-body::-webkit-scrollbar[^{]*{[^}]*display: none/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 680px\)[\s\S]*\.print-settings\.is-open\s*{[^}]*transform: translate3d\(0, 0, 0\)/s,
+  );
+  assert.match(
+    css,
+    /\.print-settings-scroll::-webkit-scrollbar[^{]*{[^}]*display: none/s,
+  );
   assert.match(css, /\.editor-project-name/);
   assert.match(css, /\.landing-shell:lang\(ko\)\s*{[^}]*word-break: keep-all/s);
   assert.match(css, /\.service-overview-heading\s*{[^}]*max-width: 900px/s);
@@ -325,6 +412,8 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(css, /\.element-header-actions/);
   assert.match(css, /\.variable-element-links/);
   assert.match(css, /\.data-add-actions/);
+  assert.match(css, /\.row-drag-handle\s*{[^}]*touch-action: none/s);
+  assert.match(css, /\.delete-selected-rows/);
   assert.match(css, /\.data-table \.add-column-cell/);
   assert.match(storage, /indexedDB\.open/);
   assert.match(storage, /LOCAL_PROJECTS_KEY/);
@@ -399,8 +488,16 @@ test("ships an installable multilingual PWA contract", async () => {
   assert.match(i18n, /projectName: "프로젝트 이름"/);
   assert.doesNotMatch(i18n, /previewData:/);
   assert.match(i18n, /variableConnections: "변수"/);
+  assert.match(i18n, /selectAllRows: "전체 행 선택"/);
+  assert.match(i18n, /deleteSelectedRows: "선택 \{count\}개 삭제"/);
+  assert.match(i18n, /reorderRow: "\{row\}행 순서 이동"/);
   assert.doesNotMatch(i18n, /저장된 작업|작업 단계|작업 순서/);
   assert.match(controls, /beforeinstallprompt/);
+  assert.match(controls, /PackagePlus/);
+  assert.doesNotMatch(
+    controls,
+    /import \{[^}]*Download[^}]*\} from "lucide-react"/,
+  );
   assert.match(
     controls,
     /navigator\.serviceWorker\.register\(withBasePath\("\/sw\.js"\)/,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, Languages } from "lucide-react";
+import { Check, Languages, PackagePlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   type Locale,
@@ -116,8 +116,9 @@ export function AppControls({
             }
           }}
           aria-expanded={showInstallHelp || undefined}
+          title={installed ? t("installed") : t("installApp")}
         >
-          {installed ? <Check size={15} /> : <Download size={15} />}
+          {installed ? <Check size={15} /> : <PackagePlus size={15} />}
           {installed ? t("installed") : t("installApp")}
         </button>
         {showInstallHelp && !installed && (
