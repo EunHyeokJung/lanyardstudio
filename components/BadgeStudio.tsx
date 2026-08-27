@@ -27,6 +27,7 @@ import {
   GalleryHorizontal,
   GripVertical,
   Group,
+  Heart,
   Image as ImageIcon,
   ImagePlus,
   Layers3,
@@ -1691,8 +1692,27 @@ function LandingPage({
       )}
 
       <footer className="landing-footer">
-        <span>LanyardStudio</span>
-        <span>{t("localOnly")}</span>
+        <span className="landing-footer-brand">LanyardStudio</span>
+        <div className="landing-footer-meta">
+          <span>{t("localOnly")}</span>
+          <span className="landing-maker-credit">
+            Made with
+            <span className="sr-only">love</span>
+            <Heart size={12} fill="currentColor" aria-hidden="true" />
+            for organizers / community leaders from Austin
+            <span>
+              (
+              <a
+                href="https://github.com/EunHyeokJung/lanyardstudio"
+                target="_blank"
+                rel="noreferrer"
+              >
+                github.com/EunHyeokJung/lanyardstudio
+              </a>
+              )
+            </span>
+          </span>
+        </div>
       </footer>
     </div>
   );

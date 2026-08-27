@@ -83,6 +83,9 @@ test("server-renders the LanyardStudio size-first landing page", async () => {
   assert.match(html, /구매 전 95 × 123 mm 내지 규격을 확인/);
   assert.match(html, /규격 직접 입력/);
   assert.match(html, /이 규격으로 만들기/);
+  assert.match(html, /Made with/);
+  assert.match(html, /for organizers \/ community leaders from Austin/);
+  assert.match(html, /github\.com\/EunHyeokJung\/lanyardstudio/);
   assert.doesNotMatch(html, /이 규격으로 시작/);
   assert.doesNotMatch(html, /POPULAR SIZES/);
   assert.doesNotMatch(html, /크기부터 인쇄까지 한 번에/);

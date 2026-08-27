@@ -1709,9 +1709,42 @@ select:focus-visible,
   font-weight: 650;
 }
 
-.landing-footer span:first-child {
+.landing-footer-brand {
   color: #1e40af;
   font-weight: 850;
+}
+
+.landing-footer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  text-align: right;
+}
+
+.landing-maker-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.landing-maker-credit svg {
+  flex: 0 0 auto;
+  color: #2563eb;
+}
+
+.landing-maker-credit a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.landing-maker-credit a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .topbar {
@@ -6176,6 +6209,20 @@ select:focus {
     justify-content: center;
     gap: 2px;
     padding: 14px 0;
+  }
+
+  .landing-footer-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    text-align: left;
+  }
+
+  .landing-maker-credit {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    line-height: 1.5;
   }
 
   .topbar {
