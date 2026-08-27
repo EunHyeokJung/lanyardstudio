@@ -174,7 +174,11 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(studio, /type BrandBarElement/);
   assert.match(studio, /type: "brandBar"/);
   assert.match(studio, /function getBrandBarSlots/);
-  assert.match(studio, /function drawBrandLogoCropped/);
+  assert.match(studio, /function drawBrandLogoFitted/);
+  assert.match(
+    studio,
+    /Math\.min\(width \/ image\.width, height \/ image\.height\) \* logo\.zoom/,
+  );
   assert.match(
     studio,
     /multiple[\s\S]{0,120}accept="image\/png,image\/jpeg,image\/webp,image\/svg\+xml,.svg"/,
@@ -226,6 +230,12 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(studio, /onResizePointerDown={handleResizePointerDown}/);
   assert.match(studio, /event\.key === "Delete" \|\| event\.key === "Backspace"/);
   assert.match(studio, /deleteSelectedFromShortcut/);
+  assert.match(studio, /application\/x-lanyardstudio-elements/);
+  assert.match(studio, /window\.addEventListener\("copy", handleCopy\)/);
+  assert.match(studio, /window\.addEventListener\("paste", handlePaste\)/);
+  assert.match(studio, /item\.type\.startsWith\("image\/"\)/);
+  assert.match(studio, /const currentSnapshot = cloneElements\(elementsRef\.current\)/);
+  assert.match(studio, /const currentSnapshot = captureDataHistoryEntry/);
   assert.match(studio, /groupId\?: string/);
   assert.match(studio, /function getElementMoveBounds/);
   assert.match(studio, /function selectCanvasElement/);
@@ -360,6 +370,22 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(css, /\.mode-nav\s*{[^}]*z-index: 80/s);
   assert.match(css, /\.responsive-editor-toolbar\s*{[^}]*z-index: 75/s);
   assert.match(css, /html\s*{[^}]*scrollbar-gutter: stable/s);
+  assert.match(
+    css,
+    /@media \(max-width: 1180px\)[\s\S]*?\.topbar-project \.brand-mark\s*{[^}]*margin-right: 0/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 1180px\)[\s\S]*?\.topbar \.install-app-button\s*{[^}]*gap: 0/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 680px\)[\s\S]*?\.landing-header \.install-app-button\s*{[^}]*gap: 0/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 680px\)[\s\S]*?\.project-tools button,[\s\S]*?\.project-tools label\s*{[^}]*gap: 0/s,
+  );
   assert.doesNotMatch(
     css,
     /\.primary-button:hover:not\(:disabled\)\s*{[^}]*transform:/s,

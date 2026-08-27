@@ -98,6 +98,8 @@ type OutputMode = "standard" | "table-tent";
 type InspectorSheetState = "collapsed" | "half" | "expanded";
 type ResponsiveToolPanel = "badge" | "background" | "elements" | null;
 
+const ELEMENT_CLIPBOARD_MIME = "application/x-lanyardstudio-elements";
+
 type CommonElement = {
   id: string;
   name: string;
@@ -2414,23 +2416,25 @@ function getBrandLogoStyle(
   const slotAspectRatio = slotWidth / Math.max(0.01, slotHeight);
   const baseWidth =
     logo.aspectRatio > slotAspectRatio
-      ? (logo.aspectRatio / slotAspectRatio) * 100
-      : 100;
+      ? 100
+      : (logo.aspectRatio / slotAspectRatio) * 100;
   const baseHeight =
     logo.aspectRatio > slotAspectRatio
-      ? 100
-      : (slotAspectRatio / logo.aspectRatio) * 100;
+      ? (slotAspectRatio / logo.aspectRatio) * 100
+      : 100;
   const width = baseWidth * logo.zoom;
   const height = baseHeight * logo.zoom;
+  const overflowX = Math.max(0, width - 100);
+  const overflowY = Math.max(0, height - 100);
   return {
     width: `${width}%`,
     height: `${height}%`,
-    left: `${-((width - 100) * logo.cropX) / 100}%`,
-    top: `${-((height - 100) * logo.cropY) / 100}%`,
+    left: `${Math.max(0, 100 - width) / 2 - (overflowX * logo.cropX) / 100}%`,
+    top: `${Math.max(0, 100 - height) / 2 - (overflowY * logo.cropY) / 100}%`,
   } as CSSProperties;
 }
 
-function drawBrandLogoCropped(
+function drawBrandLogoFitted(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
   logo: BrandLogo,
@@ -2440,17 +2444,19 @@ function drawBrandLogoCropped(
   height: number,
 ) {
   const scaleFactor =
-    Math.max(width / image.width, height / image.height) * logo.zoom;
+    Math.min(width / image.width, height / image.height) * logo.zoom;
   const drawWidth = image.width * scaleFactor;
   const drawHeight = image.height * scaleFactor;
+  const overflowX = Math.max(0, drawWidth - width);
+  const overflowY = Math.max(0, drawHeight - height);
   context.save();
   context.beginPath();
   context.rect(x, y, width, height);
   context.clip();
   context.drawImage(
     image,
-    x - (drawWidth - width) * (logo.cropX / 100),
-    y - (drawHeight - height) * (logo.cropY / 100),
+    x + Math.max(0, width - drawWidth) / 2 - overflowX * (logo.cropX / 100),
+    y + Math.max(0, height - drawHeight) / 2 - overflowY * (logo.cropY / 100),
     drawWidth,
     drawHeight,
   );
@@ -2528,7 +2534,7 @@ async function renderBadgeImage({
       context.clip();
       for (const slot of getBrandBarSlots(element)) {
         const image = await loadImage(slot.logo.src);
-        drawBrandLogoCropped(
+        drawBrandLogoFitted(
           context,
           image,
           slot.logo,
@@ -3722,9 +3728,10 @@ export function BadgeStudio() {
     if (!historyPast.length) return;
     const previous = historyPast[historyPast.length - 1];
     const restored = cloneElements(previous);
+    const currentSnapshot = cloneElements(elementsRef.current);
     setHistoryPast((current) => current.slice(0, -1));
     setHistoryFuture((current) => [
-      cloneElements(elementsRef.current),
+      currentSnapshot,
       ...current.slice(0, 39),
     ]);
     elementsRef.current = restored;
@@ -3744,10 +3751,11 @@ export function BadgeStudio() {
     if (!historyFuture.length) return;
     const next = historyFuture[0];
     const restored = cloneElements(next);
+    const currentSnapshot = cloneElements(elementsRef.current);
     setHistoryFuture((current) => current.slice(1));
     setHistoryPast((current) => [
       ...current.slice(-39),
-      cloneElements(elementsRef.current),
+      currentSnapshot,
     ]);
     elementsRef.current = restored;
     setElements(restored);
@@ -3756,9 +3764,10 @@ export function BadgeStudio() {
   const undoData = useCallback(() => {
     if (!dataHistoryPast.length) return;
     const previous = dataHistoryPast[dataHistoryPast.length - 1];
+    const currentSnapshot = captureDataHistoryEntry(previous.includesElements);
     setDataHistoryPast((current) => current.slice(0, -1));
     setDataHistoryFuture((current) => [
-      captureDataHistoryEntry(previous.includesElements),
+      currentSnapshot,
       ...current.slice(0, 29),
     ]);
     restoreDataHistoryEntry(previous);
@@ -3772,10 +3781,11 @@ export function BadgeStudio() {
   const redoData = useCallback(() => {
     if (!dataHistoryFuture.length) return;
     const next = dataHistoryFuture[0];
+    const currentSnapshot = captureDataHistoryEntry(next.includesElements);
     setDataHistoryFuture((current) => current.slice(1));
     setDataHistoryPast((current) => [
       ...current.slice(-29),
-      captureDataHistoryEntry(next.includesElements),
+      currentSnapshot,
     ]);
     restoreDataHistoryEntry(next);
     dataCellEditRecordedRef.current = false;
@@ -3998,6 +4008,134 @@ export function BadgeStudio() {
     undoData,
     undoElements,
   ]);
+
+  const clipboardHandlersRef = useRef<{
+    copy: (event: ClipboardEvent) => void;
+    paste: (event: ClipboardEvent) => void;
+  }>({ copy: () => {}, paste: () => {} });
+
+  clipboardHandlersRef.current = {
+    copy: (event) => {
+      if (
+        mode !== "design" ||
+        (event.target instanceof HTMLElement &&
+          event.target.matches(
+            "input, textarea, select, [contenteditable='true']",
+          )) ||
+        !event.clipboardData
+      ) {
+        return;
+      }
+      const selected = elementsRef.current.filter((element) =>
+        selectedElementIdsRef.current.includes(element.id),
+      );
+      if (!selected.length) return;
+      event.preventDefault();
+      event.clipboardData.setData(
+        ELEMENT_CLIPBOARD_MIME,
+        JSON.stringify(cloneElements(selected)),
+      );
+      event.clipboardData.setData(
+        "text/plain",
+        selected.map((element) => getElementLabel(element, t)).join(", "),
+      );
+    },
+    paste: (event) => {
+      if (
+        mode !== "design" ||
+        (event.target instanceof HTMLElement &&
+          event.target.matches(
+            "input, textarea, select, [contenteditable='true']",
+          )) ||
+        !event.clipboardData
+      ) {
+        return;
+      }
+
+      const pastedImage = Array.from(event.clipboardData.items)
+        .filter(
+          (item) => item.kind === "file" && item.type.startsWith("image/"),
+        )
+        .map((item) => item.getAsFile())
+        .find((file): file is File => Boolean(file));
+      if (pastedImage) {
+        event.preventDefault();
+        void addImageElement(pastedImage);
+        return;
+      }
+
+      const rawElements = event.clipboardData.getData(ELEMENT_CLIPBOARD_MIME);
+      if (!rawElements) return;
+      try {
+        const parsed = JSON.parse(rawElements);
+        if (!Array.isArray(parsed)) return;
+        const available = Math.max(0, MAX_ELEMENTS - elementsRef.current.length);
+        const sourceElements = parsed
+          .map((element) => normalizeElement(element))
+          .filter((element): element is CanvasElement => Boolean(element))
+          .slice(0, available);
+        if (!sourceElements.length) {
+          if (available === 0) {
+            setToast(t("errorProjectElements", { count: MAX_ELEMENTS }));
+          }
+          return;
+        }
+
+        event.preventDefault();
+        const groupIds = new Map<string, string>();
+        const pastedElements = sourceElements.map((source) => {
+          if (source.groupId && !groupIds.has(source.groupId)) {
+            groupIds.set(source.groupId, makeId("group"));
+          }
+          const pasted = {
+            ...(source.type === "brandBar"
+              ? {
+                  ...source,
+                  logos: source.logos.map((logo) => ({
+                    ...logo,
+                    id: makeId("brand-logo"),
+                  })),
+                }
+              : source),
+            id: makeId(source.type === "brandBar" ? "brand-bar" : "element"),
+            name: `${getElementLabel(source, t)} ${t("duplicate")}`,
+            x: source.x + 3,
+            y: source.y + 3,
+            groupId: source.groupId ? groupIds.get(source.groupId) : undefined,
+            locked: false,
+          } as CanvasElement;
+          const bounds = getElementMoveBounds(
+            pasted,
+            badgeWidth,
+            badgeHeight,
+          );
+          pasted.x = clamp(pasted.x, bounds.minX, bounds.maxX);
+          pasted.y = clamp(pasted.y, bounds.minY, bounds.maxY);
+          return pasted;
+        });
+        mutateElements((current) => [...current, ...pastedElements]);
+        setSelection(
+          pastedElements.map((element) => element.id),
+          pastedElements.at(-1)?.id,
+        );
+      } catch {
+        // Ignore clipboard formats that are not valid LanyardStudio elements.
+      }
+    },
+  };
+
+  useEffect(() => {
+    const handleCopy = (event: ClipboardEvent) =>
+      clipboardHandlersRef.current.copy(event);
+    const handlePaste = (event: ClipboardEvent) =>
+      clipboardHandlersRef.current.paste(event);
+    window.addEventListener("copy", handleCopy);
+    window.addEventListener("paste", handlePaste);
+    return () => {
+      window.removeEventListener("copy", handleCopy);
+      window.removeEventListener("paste", handlePaste);
+    };
+  }, []);
 
   function applyProject(project: BadgeProject) {
     setBadgeWidth(project.badgeWidth);

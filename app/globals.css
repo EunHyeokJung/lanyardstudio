@@ -4986,6 +4986,10 @@ select:focus {
     display: none;
   }
 
+  .topbar-project .brand-mark {
+    margin-right: 0;
+  }
+
   .editor-project-name {
     max-width: 118px;
   }
@@ -5000,6 +5004,7 @@ select:focus {
 
   .topbar .install-app-button {
     width: 40px;
+    gap: 0;
     padding: 0;
     font-size: 0;
   }
@@ -5918,6 +5923,7 @@ select:focus {
 
   .landing-header .install-app-button {
     width: 40px;
+    gap: 0;
     padding: 0;
     font-size: 0;
   }
@@ -6299,6 +6305,7 @@ select:focus {
   .project-tools label {
     width: 44px;
     min-height: 44px;
+    gap: 0;
     padding: 0;
     font-size: 0;
   }
