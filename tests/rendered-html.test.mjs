@@ -190,6 +190,12 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(studio, /applyBrandCropSession/);
   assert.match(studio, /SAMPLE_DATA_BY_LOCALE/);
   assert.match(studio, /"Alex Morgan"/);
+  assert.match(
+    studio,
+    /const landingSample = SAMPLE_DATA_BY_LOCALE\[locale\]/,
+  );
+  assert.match(studio, /landingPreviewRows\.map\(\(row\) =>/);
+  assert.match(studio, /landingPrintRows\.map\(\(\[name\]\) =>/);
   assert.match(studio, /const \[previewPageIndex, setPreviewPageIndex\]/);
   assert.match(studio, /previewRows\.map\(\(row, index\) =>/);
   assert.match(studio, /className="preview-pagination"/);
@@ -405,6 +411,14 @@ test("keeps production editing, project storage, and PDF rendering connected", a
   assert.match(
     css,
     /@media \(max-width: 680px\)[\s\S]*\.right-panel\.inspector-sheet\s*{[^}]*position: fixed/s,
+  );
+  assert.match(
+    css,
+    /\.right-panel\.inspector-sheet\.is-half\s*{[^}]*--inspector-sheet-base-translate: 0%;[^}]*--inspector-sheet-height: min\(44dvh, 420px\)/s,
+  );
+  assert.match(
+    css,
+    /\.inspector-sheet-body\s*{[^}]*padding-bottom: max\(20px, env\(safe-area-inset-bottom\)\)/s,
   );
   assert.match(
     css,

@@ -905,6 +905,16 @@ function LandingPage({
   t: Translate;
 }) {
   const [heroLineOne, heroLineTwo] = t("heroTitle").split("\n");
+  const landingSample = SAMPLE_DATA_BY_LOCALE[locale];
+  const [landingNameField, landingTeamField, landingRoleField] =
+    landingSample.fields;
+  const landingPreviewRows = landingSample.rows.slice(0, 3);
+  const landingPrintRows = landingSample.rows.slice(0, 4);
+  const [landingPresetName, landingPresetTeam] = landingSample.rows[0] ?? [
+    "",
+    "",
+    "",
+  ];
   const [showStartMenu, setShowStartMenu] = useState(false);
   const [showSavedProjects, setShowSavedProjects] = useState(false);
   const [openingProjectId, setOpeningProjectId] = useState<string | null>(null);
@@ -1234,14 +1244,14 @@ function LandingPage({
                     <span className="feature-badge-logo">BF</span>
                     <span className="feature-guide is-vertical" />
                     <span className="feature-guide is-horizontal" />
-                    <strong>{"{name}"}</strong>
-                    <small>{"{team}"}</small>
+                    <strong>{`{${landingNameField}}`}</strong>
+                    <small>{`{${landingTeamField}}`}</small>
                   </div>
                 </div>
                 <div className="feature-editor-properties" aria-hidden="true">
                   <strong>{t("variables")}</strong>
-                  <span>{"{name}"}</span>
-                  <span>{"{team}"}</span>
+                  <span>{`{${landingNameField}}`}</span>
+                  <span>{`{${landingTeamField}}`}</span>
                   <strong>{t("badgeSize")}</strong>
                   <span>W 95 mm</span>
                   <span>H 123 mm</span>
@@ -1286,15 +1296,11 @@ function LandingPage({
               <div className="feature-data-layout" aria-hidden="true">
                 <div className="feature-data-table">
                   <div className="feature-data-row is-heading">
-                    <span>{"{name}"}</span>
-                    <span>{"{team}"}</span>
-                    <span>{"{role}"}</span>
+                    <span>{`{${landingNameField}}`}</span>
+                    <span>{`{${landingTeamField}}`}</span>
+                    <span>{`{${landingRoleField}}`}</span>
                   </div>
-                  {[
-                    ["김민지", "브랜드팀", "디자이너"],
-                    ["이준호", "개발팀", "엔지니어"],
-                    ["박서연", "운영팀", "매니저"],
-                  ].map((row) => (
+                  {landingPreviewRows.map((row) => (
                     <div className="feature-data-row" key={row[0]}>
                       {row.map((cell) => (
                         <span key={cell}>{cell}</span>
@@ -1303,11 +1309,11 @@ function LandingPage({
                   ))}
                 </div>
                 <div className="feature-generated-badges">
-                  {["김민지", "이준호", "박서연"].map((name, index) => (
+                  {landingPreviewRows.map(([name, team]) => (
                     <div className="feature-generated-badge" key={name}>
                       <i>BF</i>
                       <strong>{name}</strong>
-                      <small>{["브랜드팀", "개발팀", "운영팀"][index]}</small>
+                      <small>{team}</small>
                     </div>
                   ))}
                 </div>
@@ -1350,7 +1356,7 @@ function LandingPage({
               </div>
               <div className="feature-print-layout" aria-hidden="true">
                 <div className="feature-print-sheet">
-                  {["김민지", "이준호", "박서연", "최도윤"].map((name) => (
+                  {landingPrintRows.map(([name]) => (
                     <span className="feature-print-badge" key={name}>
                       <i />
                       <strong>{name}</strong>
@@ -1418,13 +1424,13 @@ function LandingPage({
                       {preset.outputMode === "table-tent" ? (
                         <span className="preset-mini-sheet">
                           <span className="preset-mini-face is-reversed">
-                            <b>김민지</b>
-                            <em>브랜드팀</em>
+                            <b>{landingPresetName}</b>
+                            <em>{landingPresetTeam}</em>
                           </span>
                           <i />
                           <span className="preset-mini-face">
-                            <b>김민지</b>
-                            <em>브랜드팀</em>
+                            <b>{landingPresetName}</b>
+                            <em>{landingPresetTeam}</em>
                           </span>
                         </span>
                       ) : (
@@ -1437,8 +1443,8 @@ function LandingPage({
                           }
                         >
                           {!isLandscape && <i />}
-                          <b>김민지</b>
-                          <em>브랜드팀</em>
+                          <b>{landingPresetName}</b>
+                          <em>{landingPresetTeam}</em>
                         </span>
                       )}
                     </span>

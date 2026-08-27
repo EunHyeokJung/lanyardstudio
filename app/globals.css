@@ -5690,6 +5690,7 @@ select:focus {
   .right-panel.inspector-sheet {
     --inspector-sheet-base-translate: calc(100% - 72px);
     --inspector-sheet-drag-offset: 0px;
+    --inspector-sheet-height: min(70dvh, 620px);
     position: fixed;
     z-index: 72;
     right: max(8px, env(safe-area-inset-right));
@@ -5697,7 +5698,7 @@ select:focus {
     left: max(8px, env(safe-area-inset-left));
     display: flex;
     width: auto;
-    height: min(70dvh, 620px);
+    height: var(--inspector-sheet-height);
     max-height: calc(100dvh - 142px);
     overflow: hidden;
     border: 1px solid #cbd5e1;
@@ -5712,12 +5713,15 @@ select:focus {
       ),
       0
     );
-    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition:
+      height 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
   }
 
   .right-panel.inspector-sheet.is-half {
-    --inspector-sheet-base-translate: 44%;
+    --inspector-sheet-base-translate: 0%;
+    --inspector-sheet-height: min(44dvh, 420px);
   }
 
   .right-panel.inspector-sheet.is-expanded {
@@ -5818,6 +5822,8 @@ select:focus {
     flex: 1 1 auto;
     overflow-y: auto;
     overscroll-behavior: contain;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    scroll-padding-bottom: max(20px, env(safe-area-inset-bottom));
     scrollbar-width: none;
   }
 
