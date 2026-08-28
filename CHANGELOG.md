@@ -2,6 +2,18 @@
 
 All notable changes to LanyardStudio are documented here.
 
+## 1.8.0 — 2026-08-28
+
+- Reorganized the responsive editor with compact add-element tools, tablet side panels, and mobile property and print-settings sheets.
+- Fixed the half-open mobile property sheet so its scroll area ends above the bottom navigation; added bottom scroll clearance and retained hidden scrollbars.
+- Standardized navigation and icon-button alignment and removed duplicate download and row-management actions.
+- Added roster row selection, bulk deletion, drag-handle reordering, and keyboard-accessible row movement.
+- Improved element copy/paste, external clipboard-image paste, and editing undo/redo behavior.
+- Corrected brand-bar logo fitting so square and portrait logos preserve their aspect ratio instead of being cropped by default.
+- Localized landing-page design, roster, print, and size-card samples using the same eight-language sample catalog as new projects and the sample-data action. Existing project data remains unchanged when the UI language changes.
+- Added organizer/community-leader attribution to the landing footer and preserved optional GA4 cross-domain configuration.
+- Updated Korean and English documentation, keyboard shortcuts, installation and self-hosting guidance, and release distribution instructions.
+
 ## 1.7.1 — 2026-08-22
 
 - Moved the primary Cloudflare Pages domain to `lanyard-studio.com` and updated canonical URLs and deployment documentation.
